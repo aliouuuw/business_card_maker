@@ -1,14 +1,38 @@
-import puppeteer from 'puppeteer';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import chromium from "@sparticuz/chromium-min";
+import puppeteerCore from "puppeteer-core";
+import puppeteer from "puppeteer";
+
+export const dynamic = "force-dynamic";
+
+// Browser setup for Vercel serverless
+const remoteExecutablePath = "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar";
+let browser: any = null;
+
+async function getBrowser() {
+  if (browser) return browser;
+
+  if (process.env.NEXT_PUBLIC_VERCEL_ENVIRONMENT === "production") {
+    browser = await puppeteerCore.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(remoteExecutablePath),
+      headless: true,
+    });
+  } else {
+    browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      headless: true,
+    });
+  }
+  return browser;
+}
 
 export async function POST(request: Request) {
   try {
     const data = await request.json();
     
-    // Launch Puppeteer browser
-    const browser = await puppeteer.launch({
-      headless: true,
-    });
-    
+    // Get browser instance using serverless-compatible setup
+    const browser = await getBrowser();
     const page = await browser.newPage();
     
     // Create HTML content with your BusinessCard component
@@ -157,7 +181,9 @@ END:VCARD
       omitBackground: true
     });
 
-    await browser.close();
+    // Don't close the browser to enable reuse
+    // Just close the page
+    await page.close();
 
     // Return the screenshot as a response
     return new Response(
